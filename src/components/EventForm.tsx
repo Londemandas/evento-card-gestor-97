@@ -78,7 +78,16 @@ const EventForm: React.FC<EventFormProps> = ({
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    onSubmit(formData);
+    // Criar uma cópia dos dados do formulário
+    const submitData = { ...formData };
+    
+    // Se não há arquivo novo mas há preview (caso de edição), manter o logo existente
+    if (!formData.logo && logoPreview && initialData) {
+      // Não incluir logo no submitData para manter o existente
+      delete submitData.logo;
+    }
+
+    onSubmit(submitData);
     onClose();
     
     // Reset form

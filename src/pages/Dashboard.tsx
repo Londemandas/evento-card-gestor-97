@@ -37,11 +37,18 @@ const Dashboard = () => {
   const handleEventSubmit = async (data: EventFormData) => {
     try {
       if (editingEvent) {
-        await updateEvent(editingEvent.id, {
+        // Para edição, só atualizar os campos que foram fornecidos
+        const updateData: Partial<Event> = {
           name: data.name,
-          date: data.date,
-          logo: data.logo ? URL.createObjectURL(data.logo) : editingEvent.logo
-        });
+          date: data.date
+        };
+        
+        // Só atualizar logo se um novo arquivo foi fornecido
+        if (data.logo) {
+          updateData.logo = URL.createObjectURL(data.logo);
+        }
+        
+        await updateEvent(editingEvent.id, updateData);
         setEditingEvent(null);
       } else {
         await addEvent({
@@ -117,6 +124,25 @@ const Dashboard = () => {
     setShowDemandForm(false);
     setEditingDemand(null);
     setSelectedEventId('');
+  };
+
+  const handleDemandSubmit = async (data: DemandFormData) => {
+    try {
+      if (editingDemand) {
+        await updateDemand(editingDemand.id, data);
+        setEditingDemand(null);
+      } else {
+        await addDemand({
+          ...data,
+          eventId: selectedEventId,
+          isCompleted: false,
+          isArchived: false
+        });
+      }
+      setShowDemandForm(false);
+    } catch (error) {
+      console.error('Erro ao salvar demanda:', error);
+    }
   };
 
   if (isLoading) {

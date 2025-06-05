@@ -23,8 +23,13 @@ export const useSupabaseEventManager = () => {
       if (error) throw error;
       
       return data.map(event => ({
-        ...event,
+        id: event.id,
+        name: event.name,
         date: new Date(event.date),
+        logo: event.logo,
+        isArchived: event.is_archived || false,
+        isPriority: event.is_priority || false,
+        priorityOrder: event.priority_order,
         createdAt: new Date(event.created_at)
       })) as Event[];
     }
@@ -42,8 +47,13 @@ export const useSupabaseEventManager = () => {
       if (error) throw error;
       
       return data.map(demand => ({
-        ...demand,
+        id: demand.id,
+        eventId: demand.event_id,
+        title: demand.title,
+        subject: demand.subject,
         date: new Date(demand.date),
+        isCompleted: demand.is_completed || false,
+        isArchived: demand.is_archived || false,
         createdAt: new Date(demand.created_at)
       })) as Demand[];
     }

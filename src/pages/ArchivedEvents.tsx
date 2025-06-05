@@ -1,22 +1,43 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { RotateCcw, Trash2, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header';
-import { useEventManager } from '@/hooks/useEventManager';
+import { useSupabaseEventManager } from '@/hooks/useSupabaseEventManager';
 
 const ArchivedEvents = () => {
-  const { getArchivedEvents, updateEvent, deleteEvent } = useEventManager();
+  const { getArchivedEvents, updateEvent, deleteEvent, isLoading } = useSupabaseEventManager();
   const archivedEvents = getArchivedEvents();
 
-  const handleRestore = (id: string) => {
-    updateEvent(id, { isArchived: false });
-  };
-
-  const handlePermanentDelete = (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir permanentemente este evento? Esta ação não pode ser desfeita.')) {
-      deleteEvent(id);
+  const handleRestore = async (id: string) => {
+    try {
+      await updateEvent(id, { isArchived: false });
+    } catch (error) {
+      console.error('Erro ao restaurar evento:', error);
     }
   };
+
+  const handlePermanentDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir permanentemente este evento? Esta ação não pode ser desfeita.')) {
+      try {
+        await deleteEvent(id);
+      } catch (error) {
+        console.error('Erro ao excluir evento:', error);
+      }
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <div className="glass rounded-xl p-8">
+          <div className="text-white text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-blue-300 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p>Carregando eventos arquivados...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full">

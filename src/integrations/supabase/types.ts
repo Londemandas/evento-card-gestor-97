@@ -9,7 +9,86 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      demands: {
+        Row: {
+          created_at: string
+          date: string
+          event_id: string | null
+          id: string
+          is_archived: boolean | null
+          is_completed: boolean | null
+          subject: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          event_id?: string | null
+          id?: string
+          is_archived?: boolean | null
+          is_completed?: boolean | null
+          subject: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          event_id?: string | null
+          id?: string
+          is_archived?: boolean | null
+          is_completed?: boolean | null
+          subject?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demands_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          is_archived: boolean | null
+          is_priority: boolean | null
+          logo: string | null
+          name: string
+          priority_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          is_archived?: boolean | null
+          is_priority?: boolean | null
+          logo?: string | null
+          name: string
+          priority_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          is_archived?: boolean | null
+          is_priority?: boolean | null
+          logo?: string | null
+          name?: string
+          priority_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

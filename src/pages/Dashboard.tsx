@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import Header from '@/components/Header';
@@ -5,7 +6,7 @@ import SummaryIndicators from '@/components/SummaryIndicators';
 import EventRow from '@/components/EventRow';
 import EventForm from '@/components/EventForm';
 import DemandForm from '@/components/DemandForm';
-import { useEventManager } from '@/hooks/useEventManager';
+import { useSupabaseEventManager } from '@/hooks/useSupabaseEventManager';
 import { Event, Demand, EventFormData, DemandFormData } from '@/types';
 
 const Dashboard = () => {
@@ -19,8 +20,9 @@ const Dashboard = () => {
     deleteDemand,
     getActiveEvents,
     getActiveDemands,
-    getCompletedDemands
-  } = useEventManager();
+    getCompletedDemands,
+    isLoading
+  } = useSupabaseEventManager();
 
   const [showEventForm, setShowEventForm] = useState(false);
   const [showDemandForm, setShowDemandForm] = useState(false);
@@ -31,41 +33,47 @@ const Dashboard = () => {
   const activeEvents = getActiveEvents();
   const activeDemands = getActiveDemands();
   const completedDemands = getCompletedDemands();
-  const archivedEvents = 0; // Will implement later
 
-  // Ordenar eventos por data (mais recentes primeiro)
-  const sortedEvents = [...activeEvents].sort((a, b) => b.date.getTime() - a.date.getTime());
-
-  const handleEventSubmit = (data: EventFormData) => {
-    if (editingEvent) {
-      updateEvent(editingEvent.id, {
-        name: data.name,
-        date: data.date,
-        logo: data.logo ? URL.createObjectURL(data.logo) : editingEvent.logo
-      });
-      setEditingEvent(null);
-    } else {
-      addEvent({
-        name: data.name,
-        date: data.date,
-        logo: data.logo ? URL.createObjectURL(data.logo) : undefined,
-        isArchived: false,
-        isPriority: false
-      });
+  const handleEventSubmit = async (data: EventFormData) => {
+    try {
+      if (editingEvent) {
+        await updateEvent(editingEvent.id, {
+          name: data.name,
+          date: data.date,
+          logo: data.logo ? URL.createObjectURL(data.logo) : editingEvent.logo
+        });
+        setEditingEvent(null);
+      } else {
+        await addEvent({
+          name: data.name,
+          date: data.date,
+          logo: data.logo ? URL.createObjectURL(data.logo) : undefined,
+          isArchived: false,
+          isPriority: false
+        });
+      }
+      setShowEventForm(false);
+    } catch (error) {
+      console.error('Erro ao salvar evento:', error);
     }
   };
 
-  const handleDemandSubmit = (data: DemandFormData) => {
-    if (editingDemand) {
-      updateDemand(editingDemand.id, data);
-      setEditingDemand(null);
-    } else {
-      addDemand({
-        ...data,
-        eventId: selectedEventId,
-        isCompleted: false,
-        isArchived: false
-      });
+  const handleDemandSubmit = async (data: DemandFormData) => {
+    try {
+      if (editingDemand) {
+        await updateDemand(editingDemand.id, data);
+        setEditingDemand(null);
+      } else {
+        await addDemand({
+          ...data,
+          eventId: selectedEventId,
+          isCompleted: false,
+          isArchived: false
+        });
+      }
+      setShowDemandForm(false);
+    } catch (error) {
+      console.error('Erro ao salvar demanda:', error);
     }
   };
 
@@ -84,12 +92,20 @@ const Dashboard = () => {
     setShowDemandForm(true);
   };
 
-  const handleArchiveEvent = (id: string) => {
-    updateEvent(id, { isArchived: true });
+  const handleArchiveEvent = async (id: string) => {
+    try {
+      await updateEvent(id, { isArchived: true });
+    } catch (error) {
+      console.error('Erro ao arquivar evento:', error);
+    }
   };
 
-  const handleCompleteDemand = (id: string) => {
-    updateDemand(id, { isCompleted: true });
+  const handleCompleteDemand = async (id: string) => {
+    try {
+      await updateDemand(id, { isCompleted: true });
+    } catch (error) {
+      console.error('Erro ao completar demanda:', error);
+    }
   };
 
   const closeEventForm = () => {
@@ -103,6 +119,19 @@ const Dashboard = () => {
     setSelectedEventId('');
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <div className="glass rounded-xl p-8">
+          <div className="text-white text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-blue-300 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p>Carregando dados...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full relative">
       <Header />
@@ -111,13 +140,16 @@ const Dashboard = () => {
         totalEvents={activeEvents.length}
         pendingDemands={activeDemands.length}
         completedDemands={completedDemands.length}
-        archivedEvents={archivedEvents}
+        archivedEvents={0}
       />
       
       <div className="pt-24">
         <div className="px-4 mt-8">
           <div className="flex items-center justify-between mb-6">
-            <div></div>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-green-300 text-sm">Sistema sincronizado (polling a cada 5s)</span>
+            </div>
             <button
               onClick={() => setShowEventForm(true)}
               className="glass-button px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-500/30 transition-all"

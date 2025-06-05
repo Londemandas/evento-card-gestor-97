@@ -2,26 +2,35 @@
 import React from 'react';
 import { RotateCcw, Trash2, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header';
-import { useEventManager } from '@/hooks/useEventManager';
+import { useSupabaseEventManager } from '@/hooks/useSupabaseEventManager';
 
 const CompletedDemands = () => {
   const { 
     getActiveEvents, 
     getCompletedDemands, 
     updateDemand, 
-    deleteDemand 
-  } = useEventManager();
+    deleteDemand,
+    isLoading 
+  } = useSupabaseEventManager();
   
   const activeEvents = getActiveEvents();
   const completedDemands = getCompletedDemands();
 
-  const handleRestore = (id: string) => {
-    updateDemand(id, { isCompleted: false });
+  const handleRestore = async (id: string) => {
+    try {
+      await updateDemand(id, { isCompleted: false });
+    } catch (error) {
+      console.error('Erro ao restaurar demanda:', error);
+    }
   };
 
-  const handlePermanentDelete = (id: string) => {
+  const handlePermanentDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir permanentemente esta demanda? Esta ação não pode ser desfeita.')) {
-      deleteDemand(id);
+      try {
+        await deleteDemand(id);
+      } catch (error) {
+        console.error('Erro ao excluir demanda:', error);
+      }
     }
   };
 
@@ -40,6 +49,19 @@ const CompletedDemands = () => {
     }
     return acc;
   }, {} as Record<string, { event: any, demands: any[] }>);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <div className="glass rounded-xl p-8">
+          <div className="text-white text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-blue-300 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p>Carregando demandas concluídas...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full">

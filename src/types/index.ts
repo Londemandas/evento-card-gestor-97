@@ -1,3 +1,4 @@
+
 export interface Event {
   id: string;
   name: string;
@@ -7,6 +8,7 @@ export interface Event {
   isPriority: boolean;
   priorityOrder?: number;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Demand {
@@ -18,9 +20,8 @@ export interface Demand {
   isCompleted: boolean;
   isArchived: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
-
-export type DemandStatus = 'overdue' | 'current' | 'upcoming';
 
 export interface EventFormData {
   name: string;

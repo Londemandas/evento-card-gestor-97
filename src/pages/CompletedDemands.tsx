@@ -2,7 +2,7 @@
 import React from 'react';
 import { RotateCcw, Trash2, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header';
-import { useSupabaseEventManager } from '@/hooks/useSupabaseEventManager';
+import { useEventManager } from '@/hooks/useEventManager';
 
 const CompletedDemands = () => {
   const { 
@@ -11,7 +11,7 @@ const CompletedDemands = () => {
     updateDemand, 
     deleteDemand,
     isLoading 
-  } = useSupabaseEventManager();
+  } = useEventManager();
   
   const activeEvents = getActiveEvents();
   const completedDemands = getCompletedDemands();
@@ -32,11 +32,6 @@ const CompletedDemands = () => {
         console.error('Erro ao excluir demanda:', error);
       }
     }
-  };
-
-  const getEventName = (eventId: string) => {
-    const event = activeEvents.find(e => e.id === eventId);
-    return event?.name || 'Evento não encontrado';
   };
 
   const groupedDemands = activeEvents.reduce((acc, event) => {

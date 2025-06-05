@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Calendar as CalendarIcon, Upload } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Upload, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,43 +25,39 @@ const EventForm: React.FC<EventFormProps> = ({
   initialData
 }) => {
   const [formData, setFormData] = useState<EventFormData>({
-    name: initialData?.name || '',
-    date: initialData?.date || new Date(),
+    name: '',
+    date: new Date(),
     logo: undefined
   });
-  const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.logo || null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
-  const calendarRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Atualizar dados quando initialData mudar
+  // Reset form quando abrir/fechar ou quando initialData mudar
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        name: initialData.name,
-        date: initialData.date,
-        logo: undefined
-      });
-      setLogoPreview(initialData.logo || null);
-    } else {
-      setFormData({ name: '', date: new Date(), logo: undefined });
-      setLogoPreview(null);
+    if (isOpen) {
+      if (initialData) {
+        setFormData({
+          name: initialData.name,
+          date: initialData.date,
+          logo: undefined
+        });
+        setLogoPreview(initialData.logo || null);
+      } else {
+        setFormData({ name: '', date: new Date(), logo: undefined });
+        setLogoPreview(null);
+      }
     }
-  }, [initialData]);
+  }, [isOpen, initialData]);
 
-  // Fechar modal ao clicar fora, mas não no calendário
+  // Fechar modal ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-        // Verificar se o clique foi no calendário
-        if (calendarRef.current && calendarRef.current.contains(event.target as Node)) {
-          return; // Não fechar se clicou no calendário
+        if (!datePickerOpen) {
+          onClose();
         }
-        // Se o calendário estiver aberto, não fechar o modal
-        if (datePickerOpen) {
-          return;
-        }
-        onClose();
       }
     };
 
@@ -78,17 +74,7 @@ const EventForm: React.FC<EventFormProps> = ({
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    // Criar uma cópia dos dados do formulário
-    const submitData = { ...formData };
-    
-    // Se não há arquivo novo mas há preview (caso de edição), manter o logo existente
-    if (!formData.logo && logoPreview && initialData) {
-      // Não incluir logo no submitData para manter o existente
-      delete submitData.logo;
-    }
-
-    onSubmit(submitData);
-    onClose();
+    onSubmit(formData);
     
     // Reset form
     setFormData({ name: '', date: new Date(), logo: undefined });
@@ -105,12 +91,33 @@ const EventForm: React.FC<EventFormProps> = ({
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validar tipo de arquivo
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecione apenas arquivos de imagem.');
+        return;
+      }
+
+      // Validar tamanho (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('A imagem deve ter no máximo 5MB.');
+        return;
+      }
+
       setFormData(prev => ({ ...prev, logo: file }));
+      
       const reader = new FileReader();
       reader.onload = (e) => {
         setLogoPreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setFormData(prev => ({ ...prev, logo: undefined }));
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -165,36 +172,61 @@ const EventForm: React.FC<EventFormProps> = ({
                 side="top"
                 sideOffset={10}
               >
-                <div ref={calendarRef} className="pointer-events-auto">
-                  <Calendar
-                    mode="single"
-                    selected={formData.date}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </div>
+                <Calendar
+                  mode="single"
+                  selected={formData.date}
+                  onSelect={handleDateSelect}
+                  initialFocus
+                  className="p-3"
+                />
               </PopoverContent>
             </Popover>
           </div>
 
           <div>
             <Label className="text-white">Logo do Evento</Label>
-            <div className="flex items-center space-x-4">
-              <label className="glass-button px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-500/30 transition-all flex items-center space-x-2">
-                <Upload size={16} className="text-blue-300" />
-                <span className="text-white">Escolher arquivo</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoChange}
-                  className="hidden"
-                />
-              </label>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-4">
+                <label className="glass-button px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-500/30 transition-all flex items-center space-x-2">
+                  <Upload size={16} className="text-blue-300" />
+                  <span className="text-white">Escolher arquivo</span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                  />
+                </label>
+                
+                {logoPreview && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="glass-button px-3 py-2 rounded-lg hover:bg-red-500/30 transition-all"
+                  >
+                    <X size={16} className="text-red-300" />
+                  </button>
+                )}
+              </div>
               
               {logoPreview && (
-                <div className="w-12 h-12 glass-card rounded-lg overflow-hidden">
-                  <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
+                <div className="flex justify-center">
+                  <div className="w-20 h-20 glass-card rounded-lg overflow-hidden border border-white/20">
+                    <img 
+                      src={logoPreview} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {!logoPreview && !initialData?.logo && (
+                <div className="flex justify-center">
+                  <div className="w-20 h-20 glass-card rounded-lg border-2 border-dashed border-white/30 flex items-center justify-center">
+                    <Image size={24} className="text-white/50" />
+                  </div>
                 </div>
               )}
             </div>
@@ -212,6 +244,7 @@ const EventForm: React.FC<EventFormProps> = ({
             <Button
               type="submit"
               className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+              disabled={!formData.name.trim()}
             >
               {initialData ? 'Atualizar' : 'Criar Evento'}
             </Button>

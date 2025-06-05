@@ -1,113 +1,201 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Event, Demand } from '@/types';
 
 export const useEventManager = () => {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [demands, setDemands] = useState<Demand[]>([]);
+  const queryClient = useQueryClient();
 
-  // Load data from localStorage on mount
-  useEffect(() => {
-    const savedEvents = localStorage.getItem('lon-events');
-    const savedDemands = localStorage.getItem('lon-demands');
-    
-    if (savedEvents) {
-      const parsedEvents = JSON.parse(savedEvents).map((event: any) => ({
-        ...event,
+  // Query para eventos
+  const { data: events = [], isLoading: eventsLoading } = useQuery({
+    queryKey: ['events'],
+    queryFn: async () => {
+      console.log('Buscando eventos...');
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return data.map(event => ({
+        id: event.id,
+        name: event.name,
         date: new Date(event.date),
-        createdAt: new Date(event.createdAt)
-      }));
-      setEvents(parsedEvents);
+        logo: event.logo,
+        isArchived: event.is_archived || false,
+        isPriority: event.is_priority || false,
+        priorityOrder: event.priority_order,
+        createdAt: new Date(event.created_at),
+        updatedAt: new Date(event.updated_at)
+      })) as Event[];
     }
-    
-    if (savedDemands) {
-      const parsedDemands = JSON.parse(savedDemands).map((demand: any) => ({
-        ...demand,
+  });
+
+  // Query para demandas
+  const { data: demands = [], isLoading: demandsLoading } = useQuery({
+    queryKey: ['demands'],
+    queryFn: async () => {
+      console.log('Buscando demandas...');
+      const { data, error } = await supabase
+        .from('demands')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return data.map(demand => ({
+        id: demand.id,
+        eventId: demand.event_id,
+        title: demand.title,
+        subject: demand.subject,
         date: new Date(demand.date),
-        createdAt: new Date(demand.createdAt)
-      }));
-      setDemands(parsedDemands);
+        isCompleted: demand.is_completed || false,
+        isArchived: demand.is_archived || false,
+        createdAt: new Date(demand.created_at),
+        updatedAt: new Date(demand.updated_at)
+      })) as Demand[];
     }
-  }, []);
+  });
 
-  // Save events to localStorage
-  useEffect(() => {
-    localStorage.setItem('lon-events', JSON.stringify(events));
-  }, [events]);
+  // Função para adicionar evento
+  const addEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>) => {
+    console.log('Adicionando evento:', eventData);
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        name: eventData.name,
+        date: eventData.date.toISOString(),
+        logo: eventData.logo,
+        is_archived: eventData.isArchived,
+        is_priority: eventData.isPriority,
+        priority_order: eventData.priorityOrder
+      })
+      .select()
+      .single();
 
-  // Save demands to localStorage
-  useEffect(() => {
-    localStorage.setItem('lon-demands', JSON.stringify(demands));
-  }, [demands]);
+    if (error) throw error;
+    
+    queryClient.invalidateQueries({ queryKey: ['events'] });
+    return data;
+  }, [queryClient]);
 
-  const addEvent = (eventData: Omit<Event, 'id' | 'createdAt'>) => {
-    const newEvent: Event = {
-      ...eventData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      isPriority: false
-    };
-    setEvents(prev => [...prev, newEvent]);
-    return newEvent;
-  };
+  // Função para atualizar evento
+  const updateEvent = useCallback(async (id: string, updates: Partial<Event>) => {
+    console.log('Atualizando evento:', id, updates);
+    const updateData: any = {};
+    
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.date !== undefined) updateData.date = updates.date.toISOString();
+    if (updates.logo !== undefined) updateData.logo = updates.logo;
+    if (updates.isArchived !== undefined) updateData.is_archived = updates.isArchived;
+    if (updates.isPriority !== undefined) updateData.is_priority = updates.isPriority;
+    if (updates.priorityOrder !== undefined) updateData.priority_order = updates.priorityOrder;
 
-  const updateEvent = (id: string, updates: Partial<Event>) => {
-    setEvents(prev => prev.map(event => 
-      event.id === id ? { ...event, ...updates } : event
-    ));
-  };
+    const { error } = await supabase
+      .from('events')
+      .update(updateData)
+      .eq('id', id);
 
-  const toggleEventPriority = (id: string) => {
-    setEvents(prev => prev.map(event => {
-      if (event.id === id) {
-        if (event.isPriority) {
-          // Remove priority
-          return { ...event, isPriority: false, priorityOrder: undefined };
-        } else {
-          // Add priority with current timestamp as order
-          const maxPriorityOrder = Math.max(
-            ...prev.filter(e => e.isPriority).map(e => e.priorityOrder || 0),
-            0
-          );
-          return { 
-            ...event, 
-            isPriority: true, 
-            priorityOrder: maxPriorityOrder + 1 
-          };
-        }
-      }
-      return event;
-    }));
-  };
+    if (error) throw error;
+    
+    queryClient.invalidateQueries({ queryKey: ['events'] });
+  }, [queryClient]);
 
-  const deleteEvent = (id: string) => {
-    setEvents(prev => prev.filter(event => event.id !== id));
-    setDemands(prev => prev.filter(demand => demand.eventId !== id));
-  };
+  // Função para deletar evento
+  const deleteEvent = useCallback(async (id: string) => {
+    console.log('Deletando evento:', id);
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', id);
 
-  const addDemand = (demandData: Omit<Demand, 'id' | 'createdAt'>) => {
-    const newDemand: Demand = {
-      ...demandData,
-      id: Date.now().toString(),
-      createdAt: new Date()
-    };
-    setDemands(prev => [...prev, newDemand]);
-    return newDemand;
-  };
+    if (error) throw error;
+    
+    queryClient.invalidateQueries({ queryKey: ['events'] });
+    queryClient.invalidateQueries({ queryKey: ['demands'] });
+  }, [queryClient]);
 
-  const updateDemand = (id: string, updates: Partial<Demand>) => {
-    setDemands(prev => prev.map(demand => 
-      demand.id === id ? { ...demand, ...updates } : demand
-    ));
-  };
+  // Função para alternar prioridade do evento
+  const toggleEventPriority = useCallback(async (id: string) => {
+    const event = events.find(e => e.id === id);
+    if (!event) return;
 
-  const deleteDemand = (id: string) => {
-    setDemands(prev => prev.filter(demand => demand.id !== id));
-  };
+    if (event.isPriority) {
+      await updateEvent(id, { isPriority: false, priorityOrder: undefined });
+    } else {
+      const maxPriorityOrder = Math.max(
+        ...events.filter(e => e.isPriority).map(e => e.priorityOrder || 0),
+        0
+      );
+      await updateEvent(id, { 
+        isPriority: true, 
+        priorityOrder: maxPriorityOrder + 1 
+      });
+    }
+  }, [events, updateEvent]);
 
-  const getActiveEvents = () => {
+  // Função para adicionar demanda
+  const addDemand = useCallback(async (demandData: Omit<Demand, 'id' | 'createdAt' | 'updatedAt'>) => {
+    console.log('Adicionando demanda:', demandData);
+    const { data, error } = await supabase
+      .from('demands')
+      .insert({
+        event_id: demandData.eventId,
+        title: demandData.title,
+        subject: demandData.subject,
+        date: demandData.date.toISOString(),
+        is_completed: demandData.isCompleted,
+        is_archived: demandData.isArchived
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    queryClient.invalidateQueries({ queryKey: ['demands'] });
+    return data;
+  }, [queryClient]);
+
+  // Função para atualizar demanda
+  const updateDemand = useCallback(async (id: string, updates: Partial<Demand>) => {
+    console.log('Atualizando demanda:', id, updates);
+    const updateData: any = {};
+    
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.subject !== undefined) updateData.subject = updates.subject;
+    if (updates.date !== undefined) updateData.date = updates.date.toISOString();
+    if (updates.isCompleted !== undefined) updateData.is_completed = updates.isCompleted;
+    if (updates.isArchived !== undefined) updateData.is_archived = updates.isArchived;
+
+    const { error } = await supabase
+      .from('demands')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) throw error;
+    
+    queryClient.invalidateQueries({ queryKey: ['demands'] });
+  }, [queryClient]);
+
+  // Função para deletar demanda
+  const deleteDemand = useCallback(async (id: string) => {
+    console.log('Deletando demanda:', id);
+    const { error } = await supabase
+      .from('demands')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    
+    queryClient.invalidateQueries({ queryKey: ['demands'] });
+  }, [queryClient]);
+
+  // Funções auxiliares
+  const getActiveEvents = useCallback(() => {
     const activeEvents = events.filter(event => !event.isArchived);
     
-    // Separate priority and non-priority events
     const priorityEvents = activeEvents
       .filter(event => event.isPriority)
       .sort((a, b) => (a.priorityOrder || 0) - (b.priorityOrder || 0));
@@ -117,50 +205,50 @@ export const useEventManager = () => {
       .sort((a, b) => b.date.getTime() - a.date.getTime());
     
     return [...priorityEvents, ...normalEvents];
-  };
+  }, [events]);
 
-  const getArchivedEvents = () => events.filter(event => event.isArchived);
+  const getArchivedEvents = useCallback(() => 
+    events.filter(event => event.isArchived), [events]);
   
-  const getActiveDemands = (eventId?: string) => {
+  const getActiveDemands = useCallback((eventId?: string) => {
     const activeDemands = demands.filter(demand => 
       !demand.isCompleted && 
       !demand.isArchived && 
       (eventId ? demand.eventId === eventId : true)
     );
 
-    // Sort by urgency: overdue first, then current, then upcoming
     return activeDemands.sort((a, b) => {
       const getUrgencyScore = (demand: Demand) => {
         const today = new Date();
         const demandDate = new Date(demand.date);
         const diffDays = Math.ceil((demandDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
         
-        if (diffDays < 0) return 3; // overdue - highest priority
-        if (diffDays <= 3) return 2; // current - medium priority
-        return 1; // upcoming - lowest priority
+        if (diffDays < 0) return 3;
+        if (diffDays <= 3) return 2;
+        return 1;
       };
 
       const scoreA = getUrgencyScore(a);
       const scoreB = getUrgencyScore(b);
       
       if (scoreA !== scoreB) {
-        return scoreB - scoreA; // Higher score first
+        return scoreB - scoreA;
       }
       
-      // If same urgency, sort by date (earliest first)
       return a.date.getTime() - b.date.getTime();
     });
-  };
+  }, [demands]);
     
-  const getCompletedDemands = (eventId?: string) => 
+  const getCompletedDemands = useCallback((eventId?: string) => 
     demands.filter(demand => 
       demand.isCompleted && 
       (eventId ? demand.eventId === eventId : true)
-    );
+    ), [demands]);
 
   return {
     events,
     demands,
+    isLoading: eventsLoading || demandsLoading,
     addEvent,
     updateEvent,
     deleteEvent,

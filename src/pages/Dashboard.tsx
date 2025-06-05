@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import Header from '@/components/Header';
@@ -5,7 +6,7 @@ import SummaryIndicators from '@/components/SummaryIndicators';
 import EventRow from '@/components/EventRow';
 import EventForm from '@/components/EventForm';
 import DemandForm from '@/components/DemandForm';
-import { useSupabaseEventManager } from '@/hooks/useSupabaseEventManager';
+import { useEventManager } from '@/hooks/useEventManager';
 import { Event, Demand, EventFormData, DemandFormData } from '@/types';
 
 const Dashboard = () => {
@@ -21,7 +22,7 @@ const Dashboard = () => {
     getActiveDemands,
     getCompletedDemands,
     isLoading
-  } = useSupabaseEventManager();
+  } = useEventManager();
 
   const [showEventForm, setShowEventForm] = useState(false);
   const [showDemandForm, setShowDemandForm] = useState(false);
@@ -36,13 +37,11 @@ const Dashboard = () => {
   const handleEventSubmit = async (data: EventFormData) => {
     try {
       if (editingEvent) {
-        // Para edição, só atualizar os campos que foram fornecidos
         const updateData: Partial<Event> = {
           name: data.name,
           date: data.date
         };
         
-        // Só atualizar logo se um novo arquivo foi fornecido
         if (data.logo) {
           updateData.logo = URL.createObjectURL(data.logo);
         }
@@ -154,7 +153,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-green-300 text-sm">Sistema sincronizado (polling a cada 5s)</span>
+              <span className="text-green-300 text-sm">Sistema sincronizado</span>
             </div>
             <button
               onClick={() => setShowEventForm(true)}

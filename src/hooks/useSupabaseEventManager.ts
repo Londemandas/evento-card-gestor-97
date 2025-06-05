@@ -15,14 +15,18 @@ export const useSupabaseEventManager = () => {
   const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
+      console.log('Buscando eventos do Supabase...');
       const { data, error } = await supabase
         .from('events')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar eventos:', error);
+        throw error;
+      }
       
-      return data.map(event => ({
+      const mappedEvents = data.map(event => ({
         id: event.id,
         name: event.name,
         date: new Date(event.date),
@@ -32,6 +36,9 @@ export const useSupabaseEventManager = () => {
         priorityOrder: event.priority_order,
         createdAt: new Date(event.created_at)
       })) as Event[];
+
+      console.log('Eventos mapeados:', mappedEvents);
+      return mappedEvents;
     }
   });
 
@@ -39,14 +46,18 @@ export const useSupabaseEventManager = () => {
   const { data: demands = [], isLoading: demandsLoading } = useQuery({
     queryKey: ['demands'],
     queryFn: async () => {
+      console.log('Buscando demandas do Supabase...');
       const { data, error } = await supabase
         .from('demands')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar demandas:', error);
+        throw error;
+      }
       
-      return data.map(demand => ({
+      const mappedDemands = data.map(demand => ({
         id: demand.id,
         eventId: demand.event_id,
         title: demand.title,
@@ -56,12 +67,17 @@ export const useSupabaseEventManager = () => {
         isArchived: demand.is_archived || false,
         createdAt: new Date(demand.created_at)
       })) as Demand[];
+
+      console.log('Demandas mapeadas:', mappedDemands);
+      return mappedDemands;
     }
   });
 
   // Função para verificar alterações
   const checkForUpdates = useCallback(async () => {
     try {
+      console.log('Verificando atualizações...', lastSyncRef.current);
+      
       // Verificar eventos modificados
       const { data: updatedEvents, error: eventsError } = await supabase
         .from('events')
@@ -69,7 +85,10 @@ export const useSupabaseEventManager = () => {
         .gte('updated_at', lastSyncRef.current)
         .limit(1);
 
-      if (eventsError) throw eventsError;
+      if (eventsError) {
+        console.error('Erro ao verificar eventos:', eventsError);
+        return;
+      }
 
       // Verificar demandas modificadas
       const { data: updatedDemands, error: demandsError } = await supabase
@@ -78,14 +97,23 @@ export const useSupabaseEventManager = () => {
         .gte('updated_at', lastSyncRef.current)
         .limit(1);
 
-      if (demandsError) throw demandsError;
+      if (demandsError) {
+        console.error('Erro ao verificar demandas:', demandsError);
+        return;
+      }
 
       // Se houver alterações, invalidar queries para recarregar dados
       if (updatedEvents.length > 0 || updatedDemands.length > 0) {
-        console.log('Alterações detectadas, atualizando dados...');
-        queryClient.invalidateQueries({ queryKey: ['events'] });
-        queryClient.invalidateQueries({ queryKey: ['demands'] });
+        console.log('Alterações detectadas, atualizando dados...', {
+          eventos: updatedEvents.length,
+          demandas: updatedDemands.length
+        });
+        
+        await queryClient.invalidateQueries({ queryKey: ['events'] });
+        await queryClient.invalidateQueries({ queryKey: ['demands'] });
         lastSyncRef.current = new Date().toISOString();
+      } else {
+        console.log('Nenhuma alteração detectada');
       }
     } catch (error) {
       console.error('Erro ao verificar alterações:', error);
@@ -94,10 +122,12 @@ export const useSupabaseEventManager = () => {
 
   // Iniciar polling
   useEffect(() => {
+    console.log('Iniciando polling a cada', POLLING_INTERVAL, 'ms');
     pollingRef.current = setInterval(checkForUpdates, POLLING_INTERVAL);
     
     return () => {
       if (pollingRef.current) {
+        console.log('Parando polling');
         clearInterval(pollingRef.current);
       }
     };
@@ -105,6 +135,7 @@ export const useSupabaseEventManager = () => {
 
   // Função para adicionar evento
   const addEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt'>) => {
+    console.log('Adicionando evento:', eventData);
     const { data, error } = await supabase
       .from('events')
       .insert({
@@ -118,15 +149,20 @@ export const useSupabaseEventManager = () => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao adicionar evento:', error);
+      throw error;
+    }
 
-    // Invalidar queries para atualizar dados
+    console.log('Evento adicionado com sucesso:', data);
     queryClient.invalidateQueries({ queryKey: ['events'] });
+    lastSyncRef.current = new Date().toISOString();
     return data;
   }, [queryClient]);
 
   // Função para atualizar evento
   const updateEvent = useCallback(async (id: string, updates: Partial<Event>) => {
+    console.log('Atualizando evento:', id, updates);
     const updateData: any = {};
     
     if (updates.name !== undefined) updateData.name = updates.name;
@@ -141,22 +177,33 @@ export const useSupabaseEventManager = () => {
       .update(updateData)
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao atualizar evento:', error);
+      throw error;
+    }
 
+    console.log('Evento atualizado com sucesso');
     queryClient.invalidateQueries({ queryKey: ['events'] });
+    lastSyncRef.current = new Date().toISOString();
   }, [queryClient]);
 
   // Função para deletar evento
   const deleteEvent = useCallback(async (id: string) => {
+    console.log('Deletando evento:', id);
     const { error } = await supabase
       .from('events')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao deletar evento:', error);
+      throw error;
+    }
 
+    console.log('Evento deletado com sucesso');
     queryClient.invalidateQueries({ queryKey: ['events'] });
     queryClient.invalidateQueries({ queryKey: ['demands'] });
+    lastSyncRef.current = new Date().toISOString();
   }, [queryClient]);
 
   // Função para alternar prioridade do evento
@@ -180,6 +227,7 @@ export const useSupabaseEventManager = () => {
 
   // Função para adicionar demanda
   const addDemand = useCallback(async (demandData: Omit<Demand, 'id' | 'createdAt'>) => {
+    console.log('Adicionando demanda:', demandData);
     const { data, error } = await supabase
       .from('demands')
       .insert({
@@ -193,14 +241,20 @@ export const useSupabaseEventManager = () => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao adicionar demanda:', error);
+      throw error;
+    }
 
+    console.log('Demanda adicionada com sucesso:', data);
     queryClient.invalidateQueries({ queryKey: ['demands'] });
+    lastSyncRef.current = new Date().toISOString();
     return data;
   }, [queryClient]);
 
   // Função para atualizar demanda
   const updateDemand = useCallback(async (id: string, updates: Partial<Demand>) => {
+    console.log('Atualizando demanda:', id, updates);
     const updateData: any = {};
     
     if (updates.title !== undefined) updateData.title = updates.title;
@@ -214,21 +268,32 @@ export const useSupabaseEventManager = () => {
       .update(updateData)
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao atualizar demanda:', error);
+      throw error;
+    }
 
+    console.log('Demanda atualizada com sucesso');
     queryClient.invalidateQueries({ queryKey: ['demands'] });
+    lastSyncRef.current = new Date().toISOString();
   }, [queryClient]);
 
   // Função para deletar demanda
   const deleteDemand = useCallback(async (id: string) => {
+    console.log('Deletando demanda:', id);
     const { error } = await supabase
       .from('demands')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao deletar demanda:', error);
+      throw error;
+    }
 
+    console.log('Demanda deletada com sucesso');
     queryClient.invalidateQueries({ queryKey: ['demands'] });
+    lastSyncRef.current = new Date().toISOString();
   }, [queryClient]);
 
   // Funções auxiliares

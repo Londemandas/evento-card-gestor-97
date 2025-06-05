@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import Header from '@/components/Header';
@@ -124,25 +123,6 @@ const Dashboard = () => {
     setShowDemandForm(false);
     setEditingDemand(null);
     setSelectedEventId('');
-  };
-
-  const handleDemandSubmit = async (data: DemandFormData) => {
-    try {
-      if (editingDemand) {
-        await updateDemand(editingDemand.id, data);
-        setEditingDemand(null);
-      } else {
-        await addDemand({
-          ...data,
-          eventId: selectedEventId,
-          isCompleted: false,
-          isArchived: false
-        });
-      }
-      setShowDemandForm(false);
-    } catch (error) {
-      console.error('Erro ao salvar demanda:', error);
-    }
   };
 
   if (isLoading) {
